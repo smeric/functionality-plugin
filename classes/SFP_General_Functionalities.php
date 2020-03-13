@@ -51,6 +51,9 @@ if ( ! class_exists( 'SFP_General_Functionalities' ) ) {
             //add_action( 'wp_authenticate', array( __class__, 'catch_empty_user' ), 1, 2 );
             //add_action( 'login_init', array( __class__, 'loggedin_redirect' ) );
 
+            // add target="_blank" et rel="" aux liens externes
+            add_action( 'sfp_dynamic_external_js_snippet', array( __class__, 'external_links_extras' ) );
+
 
             /**
              * Filters
@@ -60,7 +63,13 @@ if ( ! class_exists( 'SFP_General_Functionalities' ) ) {
             // Author Link on Site Functionality Plugin
             // A tester ---------------------------------------------------------------
             //add_filter( 'plugin_row_meta', array( __class__, 'author_link' ), 10, 2 );
-            
+
+            // Loading dynamic external js file
+            add_action( 'wp_enqueue_scripts', array( __class__, 'dynamic_external_js_enqueue' ) );
+            add_action( 'template_redirect', array( __class__, 'dynamic_external_js' ) );
+            add_filter( 'query_vars', array( __class__, 'dynamic_external_js_query_vars' ) );
+            add_filter( 'redirect_canonical', array( __class__, 'dynamic_external_js_canonical', 10, 2 ) );
+
             // Remove accents and special chars from media file names
             add_filter( 'sanitize_file_name', 'remove_accents', 10, 1 );
             add_filter( 'sanitize_file_name_chars', array( __class__, 'sanitize_file_name_chars' ), 10, 1 );
@@ -1032,16 +1041,169 @@ if ( ! class_exists( 'SFP_General_Functionalities' ) ) {
          * @since   1.0
          * @access  public
          *
-         * @param   int     $int     Integer
-         * @param   string  $string  String
-         * @param   array   $array   Array
-         * @return  void
+         * @param   object  $menu_item  Menu item
+         * @return  object  $menu_item
          */
         static public function filter_menu_target_top( $menu_item ) {
             if ( ! is_admin() && empty( $menu_item->target ) )
                 $menu_item->target = '_top';
             return $menu_item;
         }
+
+
+        /**
+         * Create a dynamic external js file
+         *
+         * This external js file must be used to include every js snippets generated
+         * by the SFP plugin
+         *
+         * @since   1.0
+         * @access  public
+         *
+         * @return  void
+         */
+        static public function dynamic_external_js() {
+            global $wp_query;
+            if ( ! empty( $wp_query->query_vars['dynamic_external_js'] ) ) {
+                header( 'Content-Type: text/javascript;charset=UTF-8' );
+                ?>
+(function($){
+    'use strict';
+    $(function(){
+        console.log('SFP: Dynamic external js file loaded !');
+
+        // Mise en cache de variables utiles :
+        var $w=$(window),$d=$(document),$html=$('html'),$body=$('body');
+
+<?php do_action( 'sfp_dynamic_external_js_snippet' ) ?>
+
+    });
+
+})(jQuery);<?php
+                echo PHP_EOL;
+                exit;
+            }
+            return;
+        }
+
+        /**
+         * Register, enqueue and localize the dynamicly created external js file
+         *
+         * @since   1.0
+         * @access  public
+         *
+         * @return  void
+         */
+        static public function dynamic_external_js_enqueue() {
+            $js_url = get_option( 'permalink_structure' ) ? 'wp-content/plugins/functionality-plugin/assets/public/js/dynamic-scripts.js' : '?dynamic_external_js=1';
+
+            wp_register_script(
+                'sfp_dynamic_external_js',
+                get_bloginfo( 'url' ) . '/' . $js_url,
+                array( 'jquery' ),
+                '',
+                false
+            );
+            wp_enqueue_script( 'sfp_dynamic_external_js' );
+
+            wp_localize_script( 'sfp_dynamic_external_js', 'sfp_dynamic_external_js', 
+                array( 
+                    'cpn' => get_current_post_type_name(),
+                )
+            );
+        }
+
+        /**
+         * Filters the query variables whitelist before processing.
+         *
+         * Allow custom rewrite rules to allow access to external js file.
+         *
+         * @since   1.0
+         * @access  public
+         *
+         * @param   array  $vars  Registered query vars
+         * @return  array  $vars
+         */
+        static public function dynamic_external_js_query_vars( $vars ) {
+            $vars[] = 'dynamic_external_js';
+            return $vars;
+        }
+
+        /**
+         * Filters the canonical redirect URL for external js file.
+         *
+         * @since   1.0
+         * @access  public
+         *
+         * @param   string  $redirect_url   The redirect URL
+         * @param   string  $requested_url  The requested URL
+         * @return  mixed
+         */
+        static public function dynamic_external_js_canonical( $redirect_url, $requested_url ) {
+            if ( substr( $requested_url, -76 ) == 'wp-content/plugins/functionality-plugin/assets/public/js/dynamic-scripts.js' )
+                return false;
+            return $redirect_url;
+        }
+
+
+        /**
+         * External links
+         *
+         * Add target="_blank" and rel="external nofollow noopener noreferrer"
+         * to external links via javascript
+         *
+         * @since   1.0
+         * @access  public
+         *
+         * @param   int     $int     Integer
+         * @param   string  $string  String
+         * @param   array   $array   Array
+         * @return  void
+         */
+        static public function external_links_extras() {
+            ?>
+
+        /**
+         * Keep link target if already specified.
+         * Add target="_blank" and rel="external nofollow noopener noreferrer"
+         * to external links.
+         * Add  target="_self" to other links.
+         */
+        $('a[href^="http"]').attr({
+            'target':function(){
+                if(this.target){
+                    return this.target;
+                }
+                else{
+                    return (this.hostname && this.hostname !== location.hostname)?'_blank':'_self';
+                }
+            },
+            'rel':function(){
+                if(this.hostname && this.hostname !== location.hostname){
+                    var rel=this.rel;
+                    if(!rel){
+                        return 'external nofollow noopener noreferrer';
+                    }
+                    if(rel.indexOf('external')<0){
+                        rel += ' external';
+                    }
+                    if(rel.indexOf('nofollow')<0){
+                        rel += ' nofollow';
+                    }
+                    if(rel.indexOf('noopener')<0){
+                        rel += ' noopener';
+                    }
+                    if(rel.indexOf('noreferrer')<0){
+                        rel += ' noreferrer';
+                    }
+                    return rel;
+                }
+            }
+        });
+
+            <?php
+        }
+
 
         /**
          * Any function...
@@ -1061,3 +1223,16 @@ if ( ! class_exists( 'SFP_General_Functionalities' ) ) {
     }
 
 }
+
+
+/**
+ * Create rewrite rule for dynamic external js file
+ *
+ * @since  1.0
+ * @return void
+ */
+add_action( 'init', function( ) {
+    global $wp_rewrite;
+    add_rewrite_rule( 'wp-content/plugins/functionality-plugin/assets/public/js/dynamic-scripts\.js$', $wp_rewrite->index . '?dynamic_external_js=1', 'top' );
+} );
+
