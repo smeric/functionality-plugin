@@ -373,13 +373,9 @@ if ( ! class_exists( 'Functionality_Plugin' ) ) {
      * @since  1.0
      * @return void
      */
-    if ( ! function_exists( 'functionality_plugin_instanciate' ) ) {
-        //add_action( 'wp_loaded', 'functionality_plugin_instanciate', 10 );
-        add_action( 'init', 'functionality_plugin_instanciate', 1 );
-        function functionality_plugin_instanciate() {
-            return Functionality_Plugin::get_instance();
-        }
-    }
+    add_action( 'init', function(){
+        return Functionality_Plugin::get_instance();
+    }, 1 );
 
 }
 
