@@ -28,6 +28,8 @@ if ( ! class_exists( 'SFP_Activator' ) ) {
          * @return void
          */
         public static function activate() {
+            flush_rewrite_rules();
+
             /**
              * Disable critical capabilities.
              */
