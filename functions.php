@@ -115,3 +115,28 @@ if ( ! function_exists( 'expand_allowed_tags' ) ) {
         //$allowedtags["span"] = array( "style" => array() );
     }
 }
+
+
+/**
+ * Get the current post type singular name.
+ *
+ * @see https://wordpress.stackexchange.com/questions/169504/how-to-get-current-get-post-types-name
+ *
+ * @since  1.0
+ * @return string Post type name
+ */
+if ( ! function_exists( 'get_current_post_type_name' ) ) {
+    function get_current_post_type_name() {
+        if ( ! is_singular() ) {
+            return '';
+        }
+        $post = get_queried_object();
+        $post_type = get_post_type_object( get_post_type( $post ) );
+        if ( $post_type ) {
+            return esc_html( $post_type->labels->singular_name );
+        }
+        else {
+            return '';
+        }
+    }
+}
