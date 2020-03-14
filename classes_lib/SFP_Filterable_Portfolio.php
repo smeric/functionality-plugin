@@ -104,7 +104,7 @@ if ( ! class_exists( 'SFP_Filterable_Portfolio' ) ) {
         /**
          * J'ai simplement recopié le script du plugin pour pouvoir modifier les
          * caractéristiques du slider car aucun moyen de le configurer n'est 
-         * mise à dispo dans le backoffice...
+         * mis à dispo dans le backoffice...
          *
          * source https://github.com/sayful1/filterable-portfolio/blob/master/assets/src/frontend/slider.js
          */
